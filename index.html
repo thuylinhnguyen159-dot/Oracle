@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>P‑BOX · MMORPG</title>
+  <style>
+    /* ----- reset & base ----- */
+    * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0a0a1a;
+      color: #eee;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* ----- loading ----- */
+    #loading {
+      position: fixed; inset:0;
+      background: #0a0a1a;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.6s;
+    }
+    #loading.hidden { opacity:0; pointer-events:none; }
+    #loading .spinner {
+      width:60px; height:60px;
+      border:5px solid rgba(0,255,255,0.1);
+      border-top-color:#0ff;
+      border-radius:50%;
+      animation: spin 1s linear infinite;
+    }
+    #loading p { margin-top:16px; font-family:monospace; color:#0ff; letter-spacing:2px; }
+    #loading .progress {
+      width:200px; height:4px;
+      background:rgba(255,255,255,0.1);
+      border-radius:4px; margin-top:12px; overflow:hidden;
+    }
+    #loading .progress .bar { height:100%; width:0%; background:#0ff; transition:width 0.3s; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* ----- login overlay ----- */
+    #loginOverlay {
+      position: fixed; inset:0;
+      background: radial-gradient(ellipse at center, #141430 0%, #05050f 100%);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+      transition: opacity 0.6s;
+      pointer-events: auto;
+    }
+    #loginOverlay.hidden { opacity:0; pointer-events:none; }
+
+    #loginBgCanvas {
+      position: absolute; inset:0;
+      width:100%; height:100%;
+      z-index:0;
+    }
+
+    .login-box {
+      position: relative; z-index:1;
+      width:400px; max-width:92vw;
+      padding:36px 28px;
+      background: rgba(10,10,30,0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(0,255,255,0.25);
+      border-radius:32px;
+      box-shadow: 0 0 60px rgba(0,255,255,0.15), inset 0 0 60px rgba(0,255,255,0.05);
+      text-align: center;
+      pointer-events: auto;
+    }
+    .login-box .logo {
+      font-family: monospace;
+      font-size:2.8rem; font-weight:900;
+      background: linear-gradient(135deg,#0ff,#f0f);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 40px rgba(0,255,255,0.3);
+      letter-spacing:4px;
+      margin-bottom:4px;
+    }
+    .login-box .subtitle {
+      color:rgba(255,255,255,0.4);
+      font-size:0.7rem; letter-spacing:6px;
+      margin-bottom:24px;
+    }
+    .login-box input {
+      width:100%; padding:12px 16px; margin:6px 0;
+      background:rgba(255,255,255,0.06);
+      border:1px solid rgba(255,255,255,0.1);
+      border-radius:16px;
+      color:#fff; font-size:0.95rem;
+      transition:0.3s; outline:none;
+    }
+    .login-box input:focus {
+      border-color:#0ff;
+      box-shadow:0 0 20px rgba(0,255,255,0.15);
+      background:rgba(255,255,255,0.08);
+    }
+    .login-box input::placeholder { color:rgba(255,255,255,0.3); }
+    .login-box .row {
+      display:flex; gap:12px; margin:10px 0;
+      align-items:center; flex-wrap:wrap;
+    }
+    .login-box .row label {
+      font-size:0.8rem; color:rgba(255,255,255,0.6);
+      display:flex; align-items:center; gap:6px; cursor:pointer;
+    }
+    .login-box .row input[type="checkbox"] { width:auto; margin:0; accent-color:#0ff; }
+    .login-box .avatar-grid {
+      display:flex; gap:8px; justify-content:center;
+      margin:10px 0; flex-wrap:wrap;
+    }
+    .login-box .avatar-grid .av {
+      width:44px; height:44px; border-radius:50%;
+      border:2px solid transparent;
+      background:#1a1a3a;
+      display:flex; align-items:center; justify-content:center;
+      font-size:1.6rem; cursor:pointer; transition:0.2s;
+    }
+    .login-box .avatar-grid .av:hover { border-color:#0ff; transform:scale(1.05); }
+    .login-box .avatar-grid .av.selected { border-color:#ffd700; box-shadow:0 0 20px rgba(255,215,0,0.3); }
+    .login-box button {
+      width:100%; padding:12px; margin:8px 0 4px;
+      border:none; border-radius:30px;
+      font-weight:700; font-size:1rem;
+      background: linear-gradient(135deg,#0ff,#0088ff);
+      color:#000; cursor:pointer; transition:0.2s;
+      letter-spacing:1px;
+    }
+    .login-box button:hover { transform:scale(1.02); box-shadow:0 0 30px rgba(0,255,255,0.3); }
+    .login-box .switch {
+      background:transparent; color:#0ff;
+      font-size:0.8rem; padding:4px; width:auto; margin:2px auto;
+    }
+    .login-box .switch:hover { background:rgba(0,255,255,0.05); transform:none; box-shadow:none; }
+    .login-box .daily-reward {
+      margin:8px 0 0; padding:8px;
+      background:rgba(255,215,0,0.08);
+      border-radius:12px; border:1px dashed #ffd700;
+      font-size:0.8rem; color:#ffd700;
+    }
+
+    /* ----- game UI ----- */
+    #gameUI {
+      position: fixed; inset:0;
+      pointer-events:none; z-index:100;
+    }
+    #gameUI > * { pointer-events:auto; }
+    #topHUD {
+      display:flex; justify-content:space-between; align-items:flex-start;
+      padding:12px 20px;
+      background:linear-gradient(180deg,rgba(0,0,0,0.6),transparent);
+      flex-wrap:wrap; gap:8px;
+    }
+    #topHUD .left { display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+    #topHUD .stats { display:flex; flex-direction:column; gap:3px; min-width:120px; }
+    #topHUD .stats .bar-wrap { display:flex; align-items:center; gap:6px; }
+    #topHUD .stats .bar-wrap label { font-size:0.6rem; font-weight:700; width:20px; color:rgba(255,255,255,0.7); }
+    #topHUD .stats .bar { height:8px; flex:1; background:rgba(255,255,255,0.1); border-radius:20px; overflow:hidden; }
+    #topHUD .stats .bar .fill { height:100%; border-radius:20px; transition:width 0.2s; }
+    .fill.hp { background:#ff3355; } .fill.mp { background:#3399ff; } .fill.st { background:#66ff99; } .fill.xp { background:#ffaa00; }
+    #topHUD .right { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    #topHUD .right button {
+      background:rgba(10,10,30,0.65); backdrop-filter:blur(8px);
+      border:1px solid rgba(255,255,255,0.1); color:#fff;
+      padding:6px 14px; border-radius:30px;
+      font-size:0.75rem; cursor:pointer; transition:0.2s;
+      pointer-events:auto;
+    }
+    #topHUD .right button:hover { border-color:#0ff; }
+    #topHUD .right .coin { color:#ffd700; font-weight:700; }
+    #topHUD .right .gem { color:#f0f; font-weight:700; }
+
+    #quickBar {
+      position:absolute; bottom:20px; left:50%; transform:translateX(-50%);
+      display:flex; gap:4px;
+      background:rgba(10,10,30,0.65); backdrop-filter:blur(12px);
+      padding:8px 12px; border-radius:40px;
+      border:1px solid rgba(255,255,255,0.08);
+    }
+    #quickBar .slot {
+      width:44px; height:44px; border-radius:14px;
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.06);
+      display:flex; align-items:center; justify-content:center;
+      font-size:1.2rem; cursor:pointer; transition:0.2s;
+      color:rgba(255,255,255,0.3); position:relative;
+    }
+    #quickBar .slot.active { border-color:#0ff; box-shadow:0 0 16px rgba(0,255,255,0.2); background:rgba(0,255,255,0.08); color:#fff; }
+    #quickBar .slot .key { position:absolute; top:1px; right:5px; font-size:0.4rem; color:rgba(255,255,255,0.2); }
+
+    #minimap {
+      position:absolute; bottom:80px; right:16px;
+      width:110px; height:110px; border-radius:16px;
+      border:1px solid rgba(255,255,255,0.1);
+      background:rgba(0,0,0,0.6); overflow:hidden; backdrop-filter:blur(4px);
+    }
+    #minimap canvas { width:100%; height:100%; }
+
+    #questLog {
+      position:absolute; top:70px; right:16px;
+      width:220px; max-height:45vh;
+      background:rgba(10,10,30,0.65); backdrop-filter:blur(16px);
+      border-radius:16px; padding:14px;
+      border:1px solid rgba(255,255,255,0.06);
+      overflow-y:auto; display:none; pointer-events:auto;
+      font-size:0.8rem;
+    }
+    #questLog.open { display:block; }
+    #questLog h3 { font-family:monospace; font-size:0.9rem; color:#0ff; margin-bottom:10px; }
+    #questLog .q-item { padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.04); }
+    #questLog .q-item .title { font-weight:600; }
+    #questLog .q-item .desc { color:rgba(255,255,255,0.5); font-size:0.7rem; }
+    #questLog .q-item .progress { color:#ffd700; font-size:0.7rem; }
+
+    #notifications {
+      position:absolute; top:70px; left:50%; transform:translateX(-50%);
+      display:flex; flex-direction:column; align-items:center; gap:6px; pointer-events:none;
+    }
+    #notifications .note {
+      background:rgba(10,10,30,0.65); backdrop-filter:blur(12px);
+      padding:8px 24px; border-radius:30px;
+      border:1px solid rgba(255,255,255,0.06);
+      font-size:0.85rem; animation:slideDown 0.3s ease; pointer-events:auto;
+    }
+    @keyframes slideDown { 0%{ opacity:0; transform:translateY(-20px); } 100%{ opacity:1; transform:translateY(0); } }
+
+    #settingsPanel {
+      position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+      width:340px; background:rgba(10,10,30,0.65); backdrop-filter:blur(20px);
+      border-radius:28px; padding:24px;
+      border:1px solid rgba(255,255,255,0.06);
+      display:none; pointer-events:auto; z-index:200;
+    }
+    #settingsPanel.open { display:block; }
+    #settingsPanel h2 { font-family:monospace; color:#0ff; margin-bottom:16px; }
+    #settingsPanel label { display:block; margin:10px 0 4px; font-size:0.75rem; color:rgba(255,255,255,0.6); }
+    #settingsPanel input[type="range"] { width:100%; accent-color:#0ff; }
+    #settingsPanel button { margin-top:16px; padding:8px 24px; border:none; border-radius:30px; background:#0ff; color:#000; font-weight:700; cursor:pointer; }
+
+    #gameCanvas {
+      position:fixed; inset:0; width:100%; height:100%; display:block;
+      background:#1a2a3a; z-index:1; cursor:crosshair;
+    }
+
+    @media (max-width:640px) {
+      .login-box { padding:20px 16px; }
+      .login-box .logo { font-size:2rem; }
+      #topHUD { flex-direction:column; align-items:stretch; padding:8px 12px; }
+      #topHUD .left { flex-wrap:wrap; }
+      #topHUD .stats { min-width:80px; }
+      #quickBar .slot { width:34px; height:34px; font-size:0.9rem; }
+      #minimap { width:80px; height:80px; bottom:70px; right:8px; }
+      #questLog { width:180px; right:8px; top:60px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- loading -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <p>LOADING P‑BOX</p>
+    <div class="progress"><div class="bar" id="loadBar"></div></div>
+  </div>
+
+  <!-- login overlay -->
+  <div id="loginOverlay">
+    <canvas id="loginBgCanvas"></canvas>
+    <div class="login-box">
+      <div class="logo">P‑BOX</div>
+      <div class="subtitle">MMORPG</div>
+
+      <div id="loginForm">
+        <input type="text" id="loginUser" placeholder="Username" />
+        <input type="password" id="loginPass" placeholder="Password" />
+        <div class="row">
+          <label><input type="checkbox" id="rememberMe" /> Remember Me</label>
+          <label style="margin-left:auto;color:#0ff;cursor:pointer;" id="forgotBtn">Forgot?</label>
+        </div>
+        <button id="loginBtn">⚡ LOGIN</button>
+        <button class="switch" id="showRegisterBtn">Create account</button>
+        <div class="daily-reward">🎁 Daily reward: 50 coins + 5 gems</div>
+      </div>
+
+      <div id="registerForm" style="display:none;">
+        <input type="text" id="regUser" placeholder="Choose username" />
+        <input type="password" id="regPass" placeholder="Password" />
+        <input type="password" id="regPass2" placeholder="Confirm password" />
+        <div class="avatar-grid" id="avatarGrid">
+          <div class="av selected" data-av="🧝">🧝</div>
+          <div class="av" data-av="🧙">🧙</div>
+          <div class="av" data-av="🦸">🦸</div>
+          <div class="av" data-av="🧛">🧛</div>
+          <div class="av" data-av="🤖">🤖</div>
+          <div class="av" data-av="👹">👹</div>
+        </div>
+        <button id="registerBtn">✨ CREATE</button>
+        <button class="switch" id="showLoginBtn">Back to login</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- game UI -->
+  <div id="gameUI" style="display:none;">
+    <div id="topHUD">
+      <div class="left">
+        <div style="font-family:monospace;font-size:1.2rem;color:#0ff;">P‑BOX</div>
+        <div class="stats">
+          <div class="bar-wrap"><label>HP</label><div class="bar"><div class="fill hp" id="hpBar" style="width:100%"></div></div></div>
+          <div class="bar-wrap"><label>MP</label><div class="bar"><div class="fill mp" id="mpBar" style="width:100%"></div></div></div>
+          <div class="bar-wrap"><label>ST</label><div class="bar"><div class="fill st" id="stBar" style="width:100%"></div></div></div>
+          <div class="bar-wrap"><label>XP</label><div class="bar"><div class="fill xp" id="xpBar" style="width:0%"></div></div></div>
+        </div>
+        <div style="font-size:0.7rem;color:rgba(255,255,255,0.4);">Lv.<span id="levelDisplay">1</span></div>
+      </div>
+      <div class="right">
+        <span class="coin">🪙 <span id="coinDisplay">100</span></span>
+        <span class="gem">💎 <span id="gemDisplay">10</span></span>
+        <button id="questToggleBtn">📜 Quests</button>
+        <button id="settingsToggleBtn">⚙️</button>
+        <button id="saveBtn">💾 Save</button>
+        <button id="logoutBtn">🚪</button>
+      </div>
+    </div>
+
+    <div id="minimap"><canvas id="minimapCanvas" width="110" height="110"></canvas></div>
+
+    <div id="questLog"><h3>📜 QUESTS</h3><div id="questList"></div></div>
+
+    <div id="quickBar">
+      <div class="slot active" data-slot="0"><span>🗡️</span><span class="key">1</span></div>
+      <div class="slot" data-slot="1"><span>🏹</span><span class="key">2</span></div>
+      <div class="slot" data-slot="2"><span>🔥</span><span class="key">3</span></div>
+      <div class="slot" data-slot="3"><span>🧪</span><span class="key">4</span></div>
+      <div class="slot" data-slot="4"><span>🍞</span><span class="key">5</span></div>
+      <div class="slot" data-slot="5"><span>⚡</span><span class="key">6</span></div>
+      <div class="slot" data-slot="6"><span>🛡️</span><span class="key">7</span></div>
+      <div class="slot" data-slot="7"><span>💊</span><span class="key">8</span></div>
+      <div class="slot" data-slot="8"><span>📦</span><span class="key">9</span></div>
+    </div>
+
+    <div id="notifications"></div>
+
+    <div id="settingsPanel">
+      <h2>⚙️ SETTINGS</h2>
+      <label>Zoom</label>
+      <input type="range" id="zoomSlider" min="0.5" max="2.0" step="0.05" value="1.0" />
+      <label>Volume</label>
+      <input type="range" id="volSlider" min="0" max="1" step="0.05" value="0.5" />
+      <button id="closeSettingsBtn">Close</button>
+    </div>
+  </div>
+
+  <canvas id="gameCanvas"></canvas>
+
+  <script>
+    // ============================================================
+    //  P‑BOX  –  FIXED LOGIN & REGISTER
+    //  All handlers are attached via addEventListener for reliability.
+    // ============================================================
+
+    // ---------- LOADING ----------
+    let loadProgress = 0;
+    const loadBar = document.getElementById('loadBar');
+    function updateLoad(step) {
+      loadProgress = Math.min(100, loadProgress + step);
+      loadBar.style.width = loadProgress + '%';
+    }
+
+    window.addEventListener('load', () => {
+      updateLoad(20);
+      setTimeout(() => updateLoad(30), 200);
+      setTimeout(() => updateLoad(30), 400);
+      setTimeout(() => {
+        updateLoad(20);
+        document.getElementById('loading').classList.add('hidden');
+        initLoginBg();
+      }, 800);
+      setTimeout(() => {
+        document.getElementById('loading').classList.add('hidden');
+      }, 2000);
+    });
+
+    // ---------- LOGIN BACKGROUND ----------
+    function initLoginBg() {
+      const c = document.getElementById('loginBgCanvas');
+      const ctx = c.getContext('2d');
+      let w, h;
+      const particles = [];
+      const count = 30;
+      function resize() {
+        w = c.width = window.innerWidth;
+        h = c.height = window.innerHeight;
+      }
+      window.addEventListener('resize', resize);
+      resize();
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          r: Math.random() * 1.5 + 0.5,
+          dx: (Math.random() - 0.5) * 0.4,
+          dy: (Math.random() - 0.5) * 0.4,
+          color: `hsla(${Math.random()*60+180}, 80%, 60%, ${Math.random()*0.4+0.2})`
+        });
+      }
+      function draw() {
+        ctx.clearRect(0, 0, w, h);
+        for (const p of particles) {
+          p.x += p.dx; p.y += p.dy;
+          if (p.x < 0 || p.x > w) p.dx *= -1;
+          if (p.y < 0 || p.y > h) p.dy *= -1;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fillStyle = p.color;
+          ctx.fill();
+        }
+        for (let i = 0; i < particles.length; i++) {
+          for (let j = i + 1; j < particles.length; j++) {
+            const dx = particles[i].x - particles[j].x;
+            const dy = particles[i].y - particles[j].y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < 100) {
+              ctx.beginPath();
+              ctx.moveTo(particles[i].x, particles[i].y);
+              ctx.lineTo(particles[j].x, particles[j].y);
+              ctx.strokeStyle = `rgba(0,255,255,${0.06*(1-dist/100)})`;
+              ctx.lineWidth = 0.5;
+              ctx.stroke();
+            }
+          }
+        }
+        requestAnimationFrame(draw);
+      }
+      draw();
+    }
+
+    // ---------- AUTH STATE ----------
+    let currentUser = null;
+    let selectedAvatar = '🧝';
+
+    // Avatar selection
+    document.querySelectorAll('#avatarGrid .av').forEach(el => {
+      el.addEventListener('click', function() {
+        document.querySelectorAll('#avatarGrid .av').forEach(a => a.classList.remove('selected'));
+        this.classList.add('selected');
+        selectedAvatar = this.dataset.av;
+      });
+    });
+
+    // Show/hide forms
+    function showRegister() {
+      document.getElementById('loginForm').style.display = 'none';
+      document.getElementById('registerForm').style.display = 'block';
+    }
+    function showLogin() {
+      document.getElementById('loginForm').style.display = 'block';
+      document.getElementById('registerForm').style.display = 'none';
+    }
+
+    // ---------- LOGIN HANDLER ----------
+    function handleLogin() {
+      console.log('Login clicked');
+      const user = document.getElementById('loginUser').value.trim();
+      const pass = document.getElementById('loginPass').value.trim();
+      if (!user || !pass) { alert('Enter username and password.'); return; }
+      const data = localStorage.getItem('pbox_user_' + user);
+      if (!data) { alert('User not found. Register first.'); return; }
+      const parsed = JSON.parse(data);
+      if (parsed.pass !== pass) { alert('Wrong password.'); return; }
+      currentUser = user;
+      document.getElementById('loginOverlay').classList.add('hidden');
+      document.getElementById('gameUI').style.display = 'block';
+      startGame(parsed);
+      notify('Welcome back, ' + user + '!');
+      // daily reward
+      const last = localStorage.getItem('pbox_daily_' + user);
+      const today = new Date().toDateString();
+      if (last !== today) {
+        parsed.coins = (parsed.coins || 100) + 50;
+        parsed.gems = (parsed.gems || 10) + 5;
+        localStorage.setItem('pbox_user_' + user, JSON.stringify(parsed));
+        localStorage.setItem('pbox_daily_' + user, today);
+        notify('🎁 Daily reward claimed! +50 coins, +5 gems');
+        updateHUD();
+      }
+    }
+
+    // ---------- REGISTER HANDLER ----------
+    function handleRegister() {
+      console.log('Register clicked');
+      const user = document.getElementById('regUser').value.trim();
+      const pass = document.getElementById('regPass').value.trim();
+      const pass2 = document.getElementById('regPass2').value.trim();
+      if (!user || !pass || !pass2) { alert('Fill all fields.'); return; }
+      if (pass !== pass2) { alert('Passwords do not match.'); return; }
+      if (localStorage.getItem('pbox_user_' + user)) { alert('Username already exists.'); return; }
+      const data = {
+        pass: pass,
+        avatar: selectedAvatar,
+        coins: 100,
+        gems: 10,
+        level: 1,
+        xp: 0,
+        hp: 100,
+        maxHp: 100,
+        mp: 50,
+        maxMp: 50,
+        stamina: 100,
+        maxStamina: 100,
+        equipment: { head: null, chest: null, legs: null, weapon: '🗡️' },
+        inventory: ['🗡️', '🍞', '🧪'],
+        quests: [{ id: 'main', title: 'The First Step', desc: 'Kill 3 slimes', progress: 0, target: 3, done: false }],
+        stats: { kills: 0, deaths: 0 }
+      };
+      localStorage.setItem('pbox_user_' + user, JSON.stringify(data));
+      alert('Account created! Login now.');
+      showLogin();
+      document.getElementById('loginUser').value = user;
+    }
+
+    // ---------- LOGOUT ----------
+    function logout() {
+      if (confirm('Save and logout?')) { saveGame(); location.reload(); }
+    }
+
+    // ---------- ATTACH EVENT LISTENERS ----------
+    document.getElementById('loginBtn').addEventListener('click', handleLogin);
+    document.getElementById('registerBtn').addEventListener('click', handleRegister);
+    document.getElementById('showRegisterBtn').addEventListener('click', showRegister);
+    document.getElementById('showLoginBtn').addEventListener('click', showLogin);
+    document.getElementById('forgotBtn').addEventListener('click', () => alert('Reset link sent (demo).'));
+    document.getElementById('logoutBtn').addEventListener('click', logout);
+    document.getElementById('saveBtn').addEventListener('click', saveGame);
+    document.getElementById('questToggleBtn').addEventListener('click', toggleQuestLog);
+    document.getElementById('settingsToggleBtn').addEventListener('click', toggleSettings);
+    document.getElementById('closeSettingsBtn').addEventListener('click', closeSettings);
+
+    // Remember me
+    document.getElementById('rememberMe').addEventListener('change', function() {
+      if (this.checked) {
+        localStorage.setItem('pbox_remember', document.getElementById('loginUser').value.trim());
+      } else {
+        localStorage.removeItem('pbox_remember');
+      }
+    });
+
+    // Settings zoom
+    document.getElementById('zoomSlider').addEventListener('input', function() {
+      G.camera.zoom = parseFloat(this.value);
+    });
+
+    // ---------- GAME ENGINE ----------
+    let G = {
+      player: null,
+      entities: [],
+      camera: { x:0, y:0, zoom:1 },
+      keys: {},
+      mouse: { x:0, y:0, down:false },
+      time:0, dt:0,
+      weather:'clear', weatherTimer:0,
+      particles: [],
+      damageNumbers: [],
+      loot: [],
+      gameStarted: false,
+      saveTimer: 0,
+      currentSlot: 0,
+      npcs: [],
+      worldData: null
+    };
+
+    // Player class
+    class Player {
+      constructor(data) {
+        this.x = 400; this.y = 300; this.w=28; this.h=40;
+        this.vx=0; this.vy=0;
+        this.speed=140; this.runSpeed=260; this.sprintSpeed=380;
+        this.facing=0;
+        this.health=data.hp||100; this.maxHealth=data.maxHp||100;
+        this.mana=data.mp||50; this.maxMana=data.maxMp||50;
+        this.stamina=data.stamina||100; this.maxStamina=data.maxStamina||100;
+        this.level=data.level||1; this.xp=data.xp||0;
+        this.xpNext=this.level*20+10;
+        this.coins=data.coins||100; this.gems=data.gems||10;
+        this.equipment=data.equipment||{head:null,chest:null,legs:null,weapon:'🗡️'};
+        this.inventory=data.inventory||['🗡️','🍞','🧪'];
+        this.quests=data.quests||[];
+        this.stats=data.stats||{kills:0,deaths:0};
+        this.avatar=data.avatar||'🧝';
+        this.attackCooldown=0; this.attackTimer=0; this.isAttacking=false;
+        this.rolling=false; this.rollTimer=0;
+        this.staminaRegen=8; this.healthRegen=0.5; this.manaRegen=0.8;
+      }
+      get speedMult() {
+        if (this.rolling) return 1.8;
+        if (G.keys['ShiftLeft']||G.keys['ShiftRight']) {
+          if (this.stamina>5) return this.sprintSpeed/this.speed;
+          return this.runSpeed/this.speed;
+        }
+        return 1;
+      }
+      update(dt) {
+        this.stamina = Math.min(this.maxStamina, this.stamina + this.staminaRegen*dt);
+        this.health = Math.min(this.maxHealth, this.health + this.healthRegen*dt);
+        this.mana = Math.min(this.maxMana, this.mana + this.manaRegen*dt);
+        if (G.keys['ShiftLeft']||G.keys['ShiftRight']) {
+          if (this.stamina>0) this.stamina -= 20*dt;
+          if (this.stamina<0) this.stamina=0;
+        }
+        if (this.rolling) { this.rollTimer-=dt; if (this.rollTimer<=0) this.rolling=false; }
+        if (this.attackCooldown>0) this.attackCooldown-=dt;
+        if (this.attackTimer>0) this.attackTimer-=dt; else this.isAttacking=false;
+        let dx=0, dy=0;
+        if (G.keys['KeyW']||G.keys['ArrowUp']) dy=-1;
+        if (G.keys['KeyS']||G.keys['ArrowDown']) dy=1;
+        if (G.keys['KeyA']||G.keys['ArrowLeft']) dx=-1;
+        if (G.keys['KeyD']||G.keys['ArrowRight']) dx=1;
+        if (dx!==0 && dy!==0) { dx*=0.707; dy*=0.707; }
+        const spd = this.speed * this.speedMult;
+        this.vx = dx*spd; this.vy = dy*spd;
+        if (dx>0) this.facing=3; else if (dx<0) this.facing=2;
+        else if (dy<0) this.facing=1; else if (dy>0) this.facing=0;
+        this.x += this.vx*dt; this.y += this.vy*dt;
+        this.x = Math.max(20, Math.min(2000, this.x));
+        this.y = Math.max(20, Math.min(2000, this.y));
+        if (this.xp >= this.xpNext) {
+          this.xp -= this.xpNext; this.level++;
+          this.xpNext = this.level*20+10;
+          this.maxHealth+=10; this.health=this.maxHealth;
+          this.maxMana+=5; this.mana=this.maxMana;
+          notify('🎉 Level up! You are now level '+this.level);
+        }
+      }
+      attack() {
+        if (this.attackCooldown>0 || this.isAttacking) return;
+        this.isAttacking=true; this.attackTimer=0.25; this.attackCooldown=0.5;
+        const cx = this.x + (this.facing===3?20:this.facing===2?-20:0);
+        const cy = this.y + (this.facing===0?20:this.facing===1?-20:0);
+        const hitbox = {x:cx-30, y:cy-30, w:60, h:60};
+        for (const e of G.entities) {
+          if (e.type==='enemy' && !e.dead) {
+            if (rectIntersect(hitbox, {x:e.x-16, y:e.y-16, w:32, h:32})) {
+              const dmg = 15+Math.floor(Math.random()*10);
+              const crit = Math.random()<0.15;
+              const final = crit ? dmg*2 : dmg;
+              e.health -= final;
+              spawnDamageNumber(e.x, e.y-20, final, crit);
+              if (e.health <= 0) {
+                e.dead = true;
+                this.stats.kills++;
+                this.xp += 20+Math.floor(Math.random()*15);
+                spawnLoot(e.x, e.y, e.lootTable);
+                notify('💀 '+e.name+' killed!');
+                checkQuestProgress('kill', e.name);
+              }
+              break;
+            }
+          }
+        }
+        for (let i=0;i<6;i++) spawnParticle(cx+(Math.random()-0.5)*40, cy+(Math.random()-0.5)*40, '#0ff', 4, 0.3);
+      }
+      takeDamage(dmg) {
+        this.health -= dmg;
+        spawnDamageNumber(this.x, this.y-40, dmg, false);
+        if (this.health <= 0) {
+          this.health = this.maxHealth*0.3;
+          this.stats.deaths++;
+          notify('💀 You died! Respawned.');
+        }
+      }
+    }
+
+    // Enemy class
+    class Enemy {
+      constructor(x,y,type) {
+        this.x=x; this.y=y; this.type=type; this.dead=false;
+        this.health=30; this.maxHealth=30; this.speed=40+Math.random()*30;
+        this.attackCooldown=0; this.state='idle'; this.stateTimer=0;
+        this.targetX=x; this.targetY=y;
+        this.name=type==='slime'?'Slime':'Skeleton';
+        this.lootTable=[{item:'🪙',chance:0.5,amount:5},{item:'🧪',chance:0.2,amount:1}];
+        if (type==='skeleton') { this.health=45; this.maxHealth=45; this.speed=60; this.name='Skeleton'; }
+        if (type==='boss') { this.health=200; this.maxHealth=200; this.speed=30; this.name='👑 BOSS Golem'; this.lootTable=[{item:'💎',chance:1,amount:10},{item:'⚔️',chance:0.3,amount:1}]; this.phase=1; }
+      }
+      update(dt) {
+        if (this.dead) return;
+        if (this.health<=0) { this.dead=true; return; }
+        if (this.type==='boss' && this.health<this.maxHealth*0.5 && this.phase===1) {
+          this.phase=2; this.speed=60; notify('👑 BOSS enrages! Phase 2');
+        }
+        this.stateTimer-=dt;
+        if (this.stateTimer<=0) {
+          this.state = Math.random()>0.6?'attack':'patrol';
+          this.stateTimer = 2+Math.random()*3;
+          if (this.state==='patrol') { this.targetX=this.x+(Math.random()-0.5)*150; this.targetY=this.y+(Math.random()-0.5)*150; }
+        }
+        const p = G.player;
+        if (p) {
+          const dx=p.x-this.x, dy=p.y-this.y, dist=Math.sqrt(dx*dx+dy*dy);
+          if (dist<300) { this.state='attack'; this.targetX=p.x; this.targetY=p.y; }
+          if (dist<40 && this.attackCooldown<=0) {
+            p.takeDamage(10+Math.floor(Math.random()*10));
+            this.attackCooldown=1.2;
+            spawnParticle(p.x, p.y, '#ff3355', 8, 0.4);
+          }
+        }
+        const dx=this.targetX-this.x, dy=this.targetY-this.y, dist=Math.sqrt(dx*dx+dy*dy);
+        if (dist>5) { const move=Math.min(this.speed*dt, dist); this.x+=(dx/dist)*move; this.y+=(dy/dist)*move; }
+        if (this.attackCooldown>0) this.attackCooldown-=dt;
+      }
+      draw(ctx,cam) {
+        if (this.dead) return;
+        const sx=this.x-cam.x, sy=this.y-cam.y;
+        ctx.save(); ctx.translate(sx,sy);
+        if (this.type==='slime') {
+          ctx.fillStyle='#44dd88'; ctx.beginPath(); ctx.ellipse(0,4,16,12,0,0,Math.PI*2); ctx.fill();
+          ctx.fillStyle='#228844'; ctx.beginPath(); ctx.arc(0,-2,10,0,Math.PI*2); ctx.fill();
+          ctx.fillStyle='white'; ctx.beginPath(); ctx.arc(-4,-6,3,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(4,-6,3,0,Math.PI*2); ctx.fill();
+          ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(-4,-4,2,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(4,-4,2,0,Math.PI*2); ctx.fill();
+        } else if (this.type==='skeleton') {
+          ctx.fillStyle='#ddd'; ctx.fillRect(-7,-16,5,12); ctx.fillRect(2,-16,5,12);
+          ctx.beginPath(); ctx.arc(0,-18,10,0,Math.PI*2); ctx.fill();
+          ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(-4,-20,2.5,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(4,-20,2.5,0,Math.PI*2); ctx.fill();
+        } else if (this.type==='boss') {
+          ctx.fillStyle='#aa44ff'; ctx.beginPath(); ctx.arc(0,0,28,0,Math.PI*2); ctx.fill();
+          ctx.fillStyle='#ff44aa'; ctx.beginPath(); ctx.arc(-8,-6,10,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(8,-6,10,0,Math.PI*2); ctx.fill();
+          ctx.fillStyle='white'; ctx.beginPath(); ctx.arc(-12,-12,5,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(12,-12,5,0,Math.PI*2); ctx.fill();
+          ctx.fillStyle='#ff0000'; ctx.font='12px sans-serif'; ctx.fillText('👑',-10,6);
+          ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(-30,-40,60,6);
+          ctx.fillStyle='#ff3355'; ctx.fillRect(-30,-40,60*(this.health/this.maxHealth),6);
+        }
+        ctx.restore();
+        ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='9px sans-serif'; ctx.textAlign='center';
+        ctx.fillText(this.name, sx, sy-34);
+      }
+    }
+
+    // NPC class
+    class NPC {
+      constructor(x,y,name,dialogues) {
+        this.x=x; this.y=y; this.name=name; this.dialogues=dialogues;
+        this.timer=0;
+      }
+      update(dt) {
+        this.timer+=dt;
+        this.x += Math.sin(this.timer*0.3)*0.2;
+        this.y += Math.cos(this.timer*0.2)*0.2;
+      }
+      draw(ctx,cam) {
+        const sx=this.x-cam.x, sy=this.y-cam.y;
+        ctx.fillStyle='#88ccff'; ctx.beginPath(); ctx.arc(sx,sy,16,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#fff'; ctx.font='18px sans-serif'; ctx.textAlign='center'; ctx.fillText('🧑‍🌾',sx,sy+4);
+        ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='9px sans-serif'; ctx.fillText(this.name,sx,sy+30);
+        const p=G.player;
+        if (p) {
+          const dx=p.x-this.x, dy=p.y-this.y;
+          if (Math.sqrt(dx*dx+dy*dy)<70) {
+            ctx.fillStyle='rgba(0,0,0,0.7)';
+            if (ctx.roundRect) ctx.roundRect(sx-45, sy-44, 90, 20, 8);
+            else { ctx.fillRect(sx-45, sy-44, 90, 20); }
+            ctx.fill();
+            ctx.fillStyle='#fff'; ctx.font='10px sans-serif';
+            ctx.fillText(this.dialogues[Math.floor(Math.random()*this.dialogues.length)], sx, sy-30);
+          }
+        }
+      }
+    }
+
+    // ---------- WORLD ----------
+    function generateWorld() {
+      const size=2000, tileSize=40;
+      const cols=Math.ceil(size/tileSize), rows=Math.ceil(size/tileSize);
+      const grid=[];
+      for (let i=0;i<cols;i++) {
+        grid[i]=[];
+        for (let j=0;j<rows;j++) {
+          let type='grass';
+          const noise = Math.sin(i*0.05)*Math.cos(j*0.07) + Math.sin(i*0.1+j*0.08)*0.5;
+          if (noise>0.6) type='tree';
+          else if (noise<-0.4) type='water';
+          else if (noise>0.3 && noise<0.35) type='stone';
+          if (i>15 && i<22 && j>12 && j<16) type='house';
+          if (i>35 && i<39 && j>35 && j<39) type='dungeon';
+          if (i>50 && i<53 && j>20 && j<23) type='village';
+          grid[i][j]=type;
+        }
+      }
+      return {world:grid, cols, rows, tileSize};
+    }
+
+    // ---------- HELPERS ----------
+    function rectIntersect(a,b) { return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y; }
+    function spawnParticle(x,y,color,count,life) {
+      for (let i=0;i<count;i++) {
+        G.particles.push({ x, y, vx:(Math.random()-0.5)*100, vy:(Math.random()-0.5)*100-20, color, size:2+Math.random()*3, life:life||0.6, maxLife:life||0.6 });
+      }
+    }
+    function spawnDamageNumber(x,y,value,crit) {
+      G.damageNumbers.push({ x, y, value:'-'+value, crit, life:0.8, maxLife:0.8 });
+    }
+    function spawnLoot(x,y,table) {
+      for (const item of table) {
+        if (Math.random()<item.chance) {
+          G.loot.push({ x:x+(Math.random()-0.5)*30, y:y+(Math.random()-0.5)*30, icon:item.item, amount:item.amount||1 });
+        }
+      }
+      setTimeout(() => {
+        for (const l of G.loot) {
+          const p=G.player;
+          if (p) {
+            const dx=p.x-l.x, dy=p.y-l.y;
+            if (Math.sqrt(dx*dx+dy*dy)<50) {
+              if (l.icon==='🪙') p.coins += l.amount;
+              else if (l.icon==='💎') p.gems += l.amount;
+              else if (l.icon==='🧪') p.inventory.push('🧪');
+              else if (l.icon==='⚔️') p.inventory.push('⚔️');
+              notify('📦 Collected '+l.icon+' x'+l.amount);
+              l.collected = true;
+            }
+          }
+        }
+        G.loot = G.loot.filter(l=>!l.collected);
+      }, 100);
+    }
+    function notify(msg) {
+      const container = document.getElementById('notifications');
+      const el = document.createElement('div');
+      el.className = 'note';
+      el.textContent = msg;
+      container.appendChild(el);
+      setTimeout(()=>{ el.remove(); }, 3000);
+    }
+    function updateHUD() {
+      const p=G.player;
+      if (!p) return;
+      document.getElementById('hpBar').style.width = (p.health/p.maxHealth*100)+'%';
+      document.getElementById('mpBar').style.width = (p.mana/p.maxMana*100)+'%';
+      document.getElementById('stBar').style.width = (p.stamina/p.maxStamina*100)+'%';
+      document.getElementById('xpBar').style.width = (p.xp/p.xpNext*100)+'%';
+      document.getElementById('levelDisplay').textContent = p.level;
+      document.getElementById('coinDisplay').textContent = p.coins;
+      document.getElementById('gemDisplay').textContent = p.gems;
+    }
+
+    // ---------- QUESTS ----------
+    function checkQuestProgress(action, target) {
+      const p=G.player;
+      if (!p) return;
+      for (const q of p.quests) {
+        if (q.done) continue;
+        if (q.id==='main' && action==='kill' && target==='Slime') {
+          q.progress++;
+          if (q.progress>=q.target) {
+            q.done=true;
+            p.xp+=50; p.coins+=30;
+            notify('✅ Quest complete: '+q.title+'! +50 XP, +30 coins');
+            p.quests.push({ id:'main2', title:'To the Dungeon', desc:'Find the dungeon entrance', progress:0, target:1, done:false });
+          }
+        }
+      }
+      updateQuestLog();
+    }
+    function updateQuestLog() {
+      const p=G.player;
+      if (!p) return;
+      const list=document.getElementById('questList');
+      list.innerHTML='';
+      for (const q of p.quests) {
+        const div=document.createElement('div');
+        div.className='q-item';
+        div.innerHTML = `<div class="title">${q.done?'✅':'◻️'} ${q.title}</div><div class="desc">${q.desc}</div><div class="progress">${q.done?'Complete':q.progress+'/'+q.target}</div>`;
+        list.appendChild(div);
+      }
+    }
+    function toggleQuestLog() {
+      const el=document.getElementById('questLog');
+      el.classList.toggle('open');
+      if (el.classList.contains('open')) updateQuestLog();
+    }
+    function toggleSettings() { document.getElementById('settingsPanel').classList.toggle('open'); }
+    function closeSettings() { document.getElementById('settingsPanel').classList.remove('open'); }
+
+    // ---------- SAVE ----------
+    function saveGame() {
+      if (!G.player || !currentUser) return;
+      const p=G.player;
+      const data = {
+        pass: localStorage.getItem('pbox_user_'+currentUser) ? JSON.parse(localStorage.getItem('pbox_user_'+currentUser)).pass : '',
+        avatar: p.avatar,
+        coins: p.coins,
+        gems: p.gems,
+        level: p.level,
+        xp: p.xp,
+        hp: p.health,
+        maxHp: p.maxHealth,
+        mp: p.mana,
+        maxMp: p.maxMana,
+        stamina: p.stamina,
+        maxStamina: p.maxStamina,
+        equipment: p.equipment,
+        inventory: p.inventory,
+        quests: p.quests,
+        stats: p.stats,
+      };
+      localStorage.setItem('pbox_user_'+currentUser, JSON.stringify(data));
+      notify('💾 Game saved!');
+    }
+    function loadGame(user) {
+      const raw = localStorage.getItem('pbox_user_'+user);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    }
+
+    // ---------- RENDER ----------
+    function render() {
+      const canvas=document.getElementById('gameCanvas');
+      const ctx=canvas.getContext('2d');
+      const w=canvas.width, h=canvas.height;
+      ctx.clearRect(0,0,w,h);
+      const cam=G.camera;
+      const p=G.player;
+      if (!p) return;
+      const targetX = p.x - w/(2*cam.zoom);
+      const targetY = p.y - h/(2*cam.zoom);
+      cam.x += (targetX-cam.x)*0.08;
+      cam.y += (targetY-cam.y)*0.08;
+      ctx.save();
+      ctx.translate(w/2,h/2);
+      ctx.scale(cam.zoom,cam.zoom);
+      ctx.translate(-cam.x,-cam.y);
+      // world
+      const world=G.worldData;
+      if (world) {
+        const {world:grid, cols, rows, tileSize}=world;
+        const startCol=Math.max(0, Math.floor((cam.x)/tileSize)-2);
+        const endCol=Math.min(cols, Math.floor((cam.x+w/cam.zoom)/tileSize)+3);
+        const startRow=Math.max(0, Math.floor((cam.y)/tileSize)-2);
+        const endRow=Math.min(rows, Math.floor((cam.y+h/cam.zoom)/tileSize)+3);
+        for (let i=startCol;i<endCol;i++) {
+          for (let j=startRow;j<endRow;j++) {
+            const type=grid[i]?.[j]||'grass';
+            const x=i*tileSize, y=j*tileSize;
+            let color='#3a7a3a';
+            if (type==='grass') color='#4a8a4a';
+            else if (type==='tree') color='#2a6a2a';
+            else if (type==='water') color='#2266aa';
+            else if (type==='stone') color='#888';
+            else if (type==='house') color='#bb8844';
+            else if (type==='dungeon') color='#553333';
+            else if (type==='village') color='#ccaa66';
+            ctx.fillStyle=color;
+            ctx.fillRect(x,y,tileSize,tileSize);
+            if (type==='tree') {
+              ctx.fillStyle='#3a8a3a'; ctx.beginPath(); ctx.arc(x+20,y+10,10,0,Math.PI*2); ctx.fill();
+              ctx.fillStyle='#6a4a2a'; ctx.fillRect(x+18,y+18,4,14);
+            }
+            if (type==='water') {
+              ctx.fillStyle='rgba(100,200,255,0.15)'; ctx.fillRect(x,y,tileSize,tileSize);
+            }
+          }
+        }
+      }
+      // entities
+      for (const e of G.entities) if (e.draw) e.draw(ctx, cam);
+      for (const n of G.npcs) n.draw(ctx, cam);
+      // player
+      if (p) {
+        const sx=p.x-cam.x, sy=p.y-cam.y;
+        ctx.save(); ctx.translate(sx,sy);
+        ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(0,14,12,5,0,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#4488ff'; ctx.fillRect(-10,-16,20,26);
+        ctx.fillStyle='#66aaff'; ctx.fillRect(-8,-22,16,8);
+        ctx.font='20px sans-serif'; ctx.textAlign='center'; ctx.fillText(p.avatar||'🧝',0,-6);
+        ctx.font='14px sans-serif'; ctx.fillText(p.equipment.weapon||'🗡️', p.facing===3?14:p.facing===2?-20:0, p.facing===0?18:p.facing===1?-20:0);
+        if (p.isAttacking) { ctx.strokeStyle='rgba(255,255,0,0.5)'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(0,0,26,-0.5,0.5); ctx.stroke(); }
+        ctx.restore();
+        ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='9px sans-serif'; ctx.textAlign='center';
+        ctx.fillText('Lv.'+p.level+' '+(currentUser||'Player'), sx, sy-28);
+      }
+      // particles
+      for (const pt of G.particles) {
+        pt.x += pt.vx*0.016; pt.y += pt.vy*0.016; pt.life -= 0.016;
+        ctx.globalAlpha = pt.life/pt.maxLife;
+        ctx.fillStyle=pt.color;
+        ctx.beginPath(); ctx.arc(pt.x-cam.x, pt.y-cam.y, pt.size*(pt.life/pt.maxLife), 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha=1;
+      }
+      G.particles = G.particles.filter(p=>p.life>0);
+      // damage numbers
+      for (const dn of G.damageNumbers) {
+        dn.y -= 30*0.016; dn.life -= 0.016;
+        ctx.globalAlpha = dn.life/dn.maxLife;
+        ctx.fillStyle = dn.crit?'#ffdd00':'#ff3355';
+        ctx.font = 'bold '+(dn.crit?20:16)+'px sans-serif';
+        ctx.textAlign='center';
+        ctx.fillText(dn.value, dn.x-cam.x, dn.y-cam.y);
+        ctx.globalAlpha=1;
+      }
+      G.damageNumbers = G.damageNumbers.filter(d=>d.life>0);
+      // loot
+      for (const l of G.loot) {
+        ctx.font='18px sans-serif'; ctx.textAlign='center';
+        ctx.fillText(l.icon, l.x-cam.x, l.y-cam.y);
+      }
+      ctx.restore();
+      drawMinimap();
+    }
+
+    function drawMinimap() {
+      const canvas=document.getElementById('minimapCanvas');
+      const ctx=canvas.getContext('2d');
+      const w=110, h=110;
+      ctx.clearRect(0,0,w,h);
+      const p=G.player;
+      if (!p) return;
+      const scale=0.045;
+      const cx=w/2-p.x*scale, cy=h/2-p.y*scale;
+      if (G.worldData) {
+        const grid=G.worldData.world;
+        for (let i=0;i<grid.length;i+=2) {
+          for (let j=0;j<grid[0].length;j+=2) {
+            const type=grid[i]?.[j];
+            if (type) {
+              ctx.fillStyle = type==='water'?'#3388cc':type==='tree'?'#2a6a2a':'#4a8a4a';
+              ctx.fillRect(i*2*scale+cx, j*2*scale+cy, 1.2, 1.2);
+            }
+          }
+        }
+      }
+      for (const e of G.entities) if (!e.dead) {
+        ctx.fillStyle='#ff4444';
+        ctx.fillRect(e.x*scale+cx-1, e.y*scale+cy-1, 2.5, 2.5);
+      }
+      ctx.fillStyle='#00ffaa';
+      ctx.beginPath(); ctx.arc(w/2, h/2, 3.5, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle='rgba(0,255,170,0.2)'; ctx.lineWidth=1; ctx.strokeRect(0,0,w,h);
+    }
+
+    // ---------- GAME LOOP ----------
+    let lastTime=0;
+    function gameLoop(time) {
+      const dt=Math.min((time-lastTime)/1000, 0.05);
+      lastTime=time;
+      G.dt=dt; G.time+=dt;
+      if (G.gameStarted && G.player) {
+        G.player.update(dt);
+        for (const e of G.entities) e.update(dt);
+        G.entities = G.entities.filter(e=>!e.dead || e.type==='npc');
+        for (const n of G.npcs) n.update(dt);
+        G.weatherTimer += dt;
+        if (G.weatherTimer>30) {
+          G.weatherTimer=0;
+          const weathers=['clear','rain','snow','fog'];
+          G.weather = weathers[Math.floor(Math.random()*weathers.length)];
+          notify('🌤️ Weather: '+G.weather);
+        }
+        G.saveTimer += dt;
+        if (G.saveTimer>60) { G.saveTimer=0; saveGame(); }
+        updateHUD();
+        for (let i=0;i<9;i++) {
+          if (G.keys['Digit'+(i+1)]) {
+            G.currentSlot=i;
+            document.querySelectorAll('#quickBar .slot').forEach((el,idx)=> el.classList.toggle('active', idx===i));
+          }
+        }
+      }
+      render();
+      requestAnimationFrame(gameLoop);
+    }
+
+    // ---------- INPUT ----------
+    document.addEventListener('keydown', (e) => {
+      G.keys[e.code]=true;
+      if (e.code==='Space' && G.player && !G.player.rolling && G.player.stamina>20) {
+        G.player.rolling=true; G.player.rollTimer=0.3; G.player.stamina-=20;
+        notify('💨 Roll!');
+      }
+      if (e.code==='KeyE' && G.player) G.player.attack();
+      if (e.code==='KeyQ') toggleQuestLog();
+      if (e.code==='KeyI') notify('📦 Inventory: '+(G.player?G.player.inventory.join(', '):''));
+      if (e.code==='KeyM') notify('🗺️ Map: World size 2000x2000');
+    });
+    document.addEventListener('keyup', (e) => { G.keys[e.code]=false; });
+    document.addEventListener('mousedown', (e) => {
+      G.mouse.down=true;
+      if (G.player) G.player.attack();
+    });
+    document.addEventListener('mouseup', ()=>{ G.mouse.down=false; });
+
+    function resizeCanvas() {
+      const canvas=document.getElementById('gameCanvas');
+      canvas.width=window.innerWidth;
+      canvas.height=window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // ---------- START GAME ----------
+    function startGame(data) {
+      G.player = new Player(data);
+      G.gameStarted = true;
+      G.worldData = generateWorld();
+      G.entities = [];
+      for (let i=0;i<5;i++) {
+        const type = Math.random()>0.6?'skeleton':'slime';
+        const x = 150+Math.random()*1700;
+        const y = 150+Math.random()*1700;
+        G.entities.push(new Enemy(x,y,type));
+      }
+      G.entities.push(new Enemy(1000,1000,'boss'));
+      G.npcs = [
+        new NPC(350,350,'Merchant',['Welcome!','I sell rare items.','Beware the Golem.']),
+        new NPC(800,600,'Elder',['The dungeon is east.','Collect 3 slime hearts.']),
+      ];
+      if (!G.player.quests || G.player.quests.length===0) {
+        G.player.quests = [{ id:'main', title:'The First Step', desc:'Kill 3 slimes', progress:0, target:3, done:false }];
+      }
+      updateQuestLog();
+      notify('🌍 Welcome to P-BOX! Press E to attack, Space to roll.');
+      notify('📜 Press Q for quest log, I for inventory.');
+    }
+
+    // ---------- AUTO-LOGIN ----------
+    const savedUser = localStorage.getItem('pbox_remember');
+    if (savedUser) {
+      const data = loadGame(savedUser);
+      if (data) {
+        document.getElementById('loginUser').value = savedUser;
+        document.getElementById('rememberMe').checked = true;
+        setTimeout(() => {
+          document.getElementById('loginOverlay').classList.add('hidden');
+          document.getElementById('gameUI').style.display = 'block';
+          currentUser = savedUser;
+          startGame(data);
+        }, 1200);
+      }
+    }
+
+    // ---------- START LOOP ----------
+    requestAnimationFrame(gameLoop);
+    console.log('🚀 P-BOX loaded – login buttons are now active.');
+  </script>
+</body>
+</html>
